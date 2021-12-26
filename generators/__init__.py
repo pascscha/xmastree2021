@@ -46,6 +46,8 @@ class AnimatedFunction:
             return tuple([cls._mul_args(a, amount) for a in args])
         elif isinstance(args, dict):
             return {k: cls._mul_args(v, amount) for k, v in args.items()}
+        elif args is None:
+            return None
         else:
             return args * amount
 
@@ -60,6 +62,9 @@ class AnimatedFunction:
         elif isinstance(args1, dict):
             assert isinstance(args2, dict) and len(args1) == len(args2)
             return {k1: cls._add_args(v1, args2[k1]) for k1, v1 in args1.items()}
+        elif args1 is None:
+            assert args2 is None
+            return None
         else:
             return args1 + args2
 
@@ -96,6 +101,7 @@ class Cone(AnimatedFunction):
                     frame[i] = self.color
         return frame
 
+
 class Sphere(AnimatedFunction):
     def __init__(self, center, inner_radius, outer_radius, color):
         super().__init__(center, inner_radius, outer_radius, color)
@@ -112,6 +118,7 @@ class Sphere(AnimatedFunction):
                 frame[i] = self.color
         return frame
 
+
 class Combiner(AnimatedFunction):
     def __init__(self, functions):
         super().__init__(functions)
@@ -122,14 +129,53 @@ class Combiner(AnimatedFunction):
             frame = f.get_frame(coords, frame)
         return frame
 
+
+class Transformer(AnimatedFunction):
+    def __init__(self, function, offset=None, transform=None):
+        super().__init__(function, offset=offset, transform=transform)
+        self.offset = offset
+        self.transform = transform
+        self.function = function
+
+    def get_frame(self, coords, frame):
+        coords = coords.copy()
+        if self.transform is not None:
+            for i in range(len(coords)):
+                coords[i] = coords[i] @ self.transform
+        if self.offset is not None:
+            for i in range(len(coords)):
+                coords[i] = coords[i] - self.offset
+
+        return self.function.get_frame(coords, frame)
+
+
+class RotatorZ(AnimatedFunction):
+    def __init__(self, angle, function):
+        super().__init__(angle, function)
+        self.angle = angle
+        self.function = function
+
+    def get_frame(self, coords, frame):
+        transform = np.array([
+            [np.cos(self.angle), -np.sin(self.angle), 0],
+            [np.sin(self.angle), np.cos(self.angle), 0],
+            [0, 0, 1]
+        ])
+        trans = Transformer(self.function, transform=transform)
+        return trans.get_frame(coords, frame)
+
+
 def inter_linear(x):
     return x
+
 
 def inter_squared(x):
     return x**2
 
+
 def inter_squared_inv(x):
     return 1 - (1-x)**2
+
 
 def animate(coords, f1, f2, interval, duration, interpolation=inter_linear):
     n_frames = int(duration / interval)
@@ -140,26 +186,29 @@ def animate(coords, f1, f2, interval, duration, interpolation=inter_linear):
         out[i] = f.get_frame(coords, out[i])
     return out
 
+
 def generate(events, interval):
     coords = Animation.load_csv("coords_2021.csv")
     animations = []
     for i in range(len(events) - 1):
         animations.append(
             animate(
-                coords, 
+                coords,
                 events[i][0],
                 events[i+1][0],
                 interval,
                 events[i+1][1],
-                interpolation=events[i+1][2]                
+                interpolation=events[i+1][2]
             )
         )
 
     return animations
 
+
 def save(animations, path):
     tot_len = sum(len(a) for a in animations)
-    animation = np.empty((tot_len, animations[0].shape[1], 3), dtype=np.float32)
+    animation = np.empty(
+        (tot_len, animations[0].shape[1], 3), dtype=np.float32)
     i = 0
     for a in animations:
         animation[i:i+len(a)] = a
