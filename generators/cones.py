@@ -17,4 +17,6 @@ if __name__ == "__main__":
         (init, 500, inter_linear),
     ]
 
-    generate(events, "examples/cones.csv", INTERVAL)
+    animations = generate(events, INTERVAL)
+
+    save(animations, "examples/cones.csv")

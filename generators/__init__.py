@@ -96,6 +96,22 @@ class Cone(AnimatedFunction):
                     frame[i] = self.color
         return frame
 
+class Sphere(AnimatedFunction):
+    def __init__(self, center, inner_radius, outer_radius, color):
+        super().__init__(center, inner_radius, outer_radius, color)
+        self.center = center
+        self.inner_radius = inner_radius
+        self.outer_radius = outer_radius
+        self.color = color
+
+    def get_frame(self, coords, frame):
+        for i, coord in enumerate(coords):
+            vect = coord - self.center
+            d = (vect[0] ** 2 + vect[1] ** 2 + vect[2] ** 2) ** 1/2
+            if self.inner_radius <= d < self.outer_radius:
+                frame[i] = self.color
+        return frame
+
 class Combiner(AnimatedFunction):
     def __init__(self, functions):
         super().__init__(functions)
@@ -124,7 +140,7 @@ def animate(coords, f1, f2, interval, duration, interpolation=inter_linear):
         out[i] = f.get_frame(coords, out[i])
     return out
 
-def generate(events, path, interval):
+def generate(events, interval):
     coords = Animation.load_csv("coords_2021.csv")
     animations = []
     for i in range(len(events) - 1):
@@ -139,9 +155,11 @@ def generate(events, path, interval):
             )
         )
 
+    return animations
 
+def save(animations, path):
     tot_len = sum(len(a) for a in animations)
-    animation = np.empty((tot_len, len(coords), 3), dtype=np.float32)
+    animation = np.empty((tot_len, animations[0].shape[1], 3), dtype=np.float32)
     i = 0
     for a in animations:
         animation[i:i+len(a)] = a
